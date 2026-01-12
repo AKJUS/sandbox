@@ -571,7 +571,14 @@ If the project wishes to rejoin the CNCF Sandbox in the future, they will need t
         if (error.response) {
           console.error(`   HTTP Status: ${error.response.status}`);
           if (error.response.status === 403) {
-            console.error('   This may be a rate limit error. Consider slowing down or waiting.');
+            console.error('   ⚠️  PERMISSION ERROR: The GitHub token does not have sufficient permissions.');
+            console.error('   Required permissions:');
+            console.error('   - Issues: Read and write');
+            console.error('   - Repository access: cncf/sandbox AND cncf/toc');
+            console.error('   Please verify the ONBOARDING_MONITOR_TOKEN secret has the correct permissions.');
+            console.error('   Response:', JSON.stringify(error.response.data, null, 2));
+          } else if (error.response.status === 429) {
+            console.error('   This is a rate limit error. Consider slowing down or waiting.');
           }
         }
         // Continue processing other issues even if one fails
