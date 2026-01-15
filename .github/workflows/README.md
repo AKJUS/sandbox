@@ -22,7 +22,30 @@ Automatically creates onboarding issues when sandbox applications pass community
 
 ---
 
-### 2. Onboarding Progress Monitor (onboarding-monitor.yml)
+### 2. Contribution Agreement Signed Onboarding (contribution-agreement-signed-onboarding.yml)
+
+Creates onboarding issues when a sandbox application transitions from `contribution-agreement/unsigned` to `contribution-agreement/signed`.
+
+**How It Works:**
+1. **Trigger:** When a Sandbox application issue transitions to “contribution agreement signed” via label events (i.e., `contribution-agreement/signed` is present and `contribution-agreement/unsigned` is absent)
+2. **Guards:** Only proceeds for open `[Sandbox] {Project Name}` issues that have the `gitvote/passed` label
+3. **Safety:** Checks for an existing onboarding issue (open or closed) before creating a new one
+4. **Action:** Creates a new onboarding issue using the project-onboarding.md template
+5. **Post-action:** Removes `contribution-agreement/unsigned` from the newly created onboarding issue (this workflow runs only once the agreement is signed)
+6. **Result:** Comments on original application issue and closes it
+
+**Files:**
+- `.github/workflows/contribution-agreement-signed-onboarding.yml` - Workflow definition
+- `scripts/create-onboarding-issue.js` - Creation logic
+- `.github/ISSUE_TEMPLATE/project-onboarding.md` - Onboarding template
+
+**Testing:**
+- Ensure an open Sandbox application issue has `gitvote/passed` and `contribution-agreement/unsigned`
+- Remove `contribution-agreement/unsigned` and add `contribution-agreement/signed`
+
+---
+
+### 3. Onboarding Progress Monitor (onboarding-monitor.yml)
 
 Automated monitoring of sandbox project onboarding progress. Creates health issues in the TOC repository when projects approach the archival deadline.
 

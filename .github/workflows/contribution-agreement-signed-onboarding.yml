@@ -1,0 +1,140 @@
+name: Contribution Agreement Signed -> Create Onboarding Issue
+
+on:
+  issues:
+    types: [labeled, unlabeled]
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: contribution-agreement-signed-onboarding-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  create-onboarding-after-contribution-agreement-signed:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' && (github.event.action == 'labeled' || github.event.action == 'unlabeled')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create onboarding issue when contribution agreement becomes signed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {
+              createOnboardingIssue,
+              commentAndClose,
+              checkExistingOnboardingIssue
+            } = require('./scripts/create-onboarding-issue.js');
+
+            const issue = context.payload.issue;
+            const eventAction = context.payload.action;
+            const eventLabel = context.payload.label?.name;
+
+            const labels = issue.labels || [];
+            const labelNames = labels.map(l => (typeof l === 'string' ? l : l.name));
+
+            const hasVotePassed = labelNames.includes('gitvote/passed');
+            const hasUnsignedContributionAgreementLabel = labelNames.includes('contribution-agreement/unsigned');
+            const hasSignedContributionAgreementLabel = labelNames.includes('contribution-agreement/signed');
+            const isOpen = issue.state === 'open';
+
+            // We only want to act once the issue is in the "contribution agreement signed" state:
+            // signed label present AND unsigned label absent.
+            const isContributionAgreementSignedState =
+              hasSignedContributionAgreementLabel && !hasUnsignedContributionAgreementLabel;
+
+            // Only act when the transition happens via a contribution agreement label change event:
+            // - unsigned removed AND signed already present, OR
+            // - signed added AND unsigned already removed.
+            const isRelevantEvent =
+              (eventAction === 'unlabeled' &&
+                eventLabel === 'contribution-agreement/unsigned' &&
+                hasSignedContributionAgreementLabel) ||
+              (eventAction === 'labeled' &&
+                eventLabel === 'contribution-agreement/signed' &&
+                !hasUnsignedContributionAgreementLabel);
+
+            if (!isRelevantEvent) {
+              console.log(
+                `ℹ️  Skipping: not a contribution agreement transition event (action: ${eventAction}, label: ${eventLabel}).`
+              );
+              return;
+            }
+
+            if (!isOpen) {
+              console.log(`ℹ️  Skipping: issue #${issue.number} is not open (state: ${issue.state}).`);
+              return;
+            }
+
+            // Ensure we only proceed for Sandbox application issues with a passed vote.
+            const title = issue.title || '';
+            const sandboxMatch = title.match(/^\[Sandbox\]\s*(.+)$/);
+            if (!sandboxMatch) {
+              console.log('ℹ️  Skipping: not a Sandbox application issue.');
+              return;
+            }
+
+            if (!hasVotePassed) {
+              console.log('ℹ️  Skipping: issue does not have gitvote/passed label.');
+              return;
+            }
+
+            if (!isContributionAgreementSignedState) {
+              console.log(
+                'ℹ️  Skipping: contribution agreement signed state not satisfied (needs signed present and unsigned absent).'
+              );
+              return;
+            }
+
+            const projectName = sandboxMatch[1].trim();
+            console.log(
+              `✅ Contribution agreement is signed for "${projectName}" (issue #${issue.number}). Creating onboarding issue...`
+            );
+
+            // Extra safety check: never create a duplicate onboarding issue if one already exists (open or closed).
+            const existing = await checkExistingOnboardingIssue(github, context, projectName);
+            if (existing.exists) {
+              console.log(
+                `⏭️  Skipping creation: onboarding issue already exists for "${projectName}": #${existing.issueNumber} (${existing.state})`
+              );
+              return;
+            }
+
+            const result = await createOnboardingIssue(github, context, projectName, issue.number);
+            if (result.alreadyExists) {
+              console.log(
+                `⏭️  Onboarding issue already exists for "${projectName}": #${result.issueNumber} (${result.state})`
+              );
+              return;
+            }
+
+            // This workflow runs only once the contribution agreement is signed, so remove the
+            // `contribution-agreement/unsigned` label from the newly created onboarding issue.
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: result.issueNumber,
+                name: 'contribution-agreement/unsigned'
+              });
+              console.log(`✅ Removed label contribution-agreement/unsigned from onboarding issue #${result.issueNumber}`);
+            } catch (error) {
+              // GitHub returns 404 if the label isn't present; ignore that and proceed.
+              const status = error?.status || error?.response?.status;
+              if (status === 404) {
+                console.log(`ℹ️  Label contribution-agreement/unsigned not present on onboarding issue #${result.issueNumber}; nothing to remove.`);
+              } else {
+                console.warn(
+                  `⚠️  Failed to remove label contribution-agreement/unsigned from onboarding issue #${result.issueNumber}: ${error?.message || error}`
+                );
+              }
+            }
+
+            await commentAndClose(github, context, issue.number, result.issueNumber, projectName);
+            console.log(`✅ Successfully created onboarding issue #${result.issueNumber} and closed issue #${issue.number}`);
+
