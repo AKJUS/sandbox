@@ -27,11 +27,12 @@ Automatically creates onboarding issues when sandbox applications pass community
 Creates onboarding issues when a sandbox application transitions from `contribution-agreement/unsigned` to `contribution-agreement/signed`.
 
 **How It Works:**
-1. **Trigger:** When `contribution-agreement/unsigned` is removed and `contribution-agreement/signed` is added (via issue label events)
+1. **Trigger:** When a Sandbox application issue transitions to “contribution agreement signed” via label events (i.e., `contribution-agreement/signed` is present and `contribution-agreement/unsigned` is absent)
 2. **Guards:** Only proceeds for open `[Sandbox] {Project Name}` issues that have the `gitvote/passed` label
 3. **Safety:** Checks for an existing onboarding issue (open or closed) before creating a new one
 4. **Action:** Creates a new onboarding issue using the project-onboarding.md template
-5. **Result:** Comments on original application issue and closes it
+5. **Post-action:** Removes `contribution-agreement/unsigned` from the newly created onboarding issue (this workflow runs only once the agreement is signed)
+6. **Result:** Comments on original application issue and closes it
 
 **Files:**
 - `.github/workflows/contribution-agreement-signed-onboarding.yml` - Workflow definition
