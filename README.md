@@ -148,6 +148,7 @@ Once projects are accepted into the Sandbox, CNCF staff will open a project onbo
 This repository includes GitHub Actions workflows to automate the sandbox onboarding process:
 
 - **Vote Monitor:** Automatically creates onboarding issues when applications pass voting
+- **Contribution Agreement Signed Onboarding:** Creates onboarding issues when a sandbox application transitions from `contribution-agreement/unsigned` to `contribution-agreement/signed` (and will not create a duplicate onboarding issue if one already exists, open or closed)
 - **Onboarding Progress Monitor:** Tracks onboarding progress and creates health issues in the TOC repository
 
 For detailed documentation, see [Workflows README](.github/workflows/README.md).
